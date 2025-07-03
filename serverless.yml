@@ -1,0 +1,58 @@
+service: beacon-api
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    SECRET_KEY: ${env:SECRET_KEY}
+    DEBUG: false
+  
+  # IAM permissions
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - rds:DescribeDBInstances
+        - rds:DescribeDBClusters
+      Resource: "*"
+
+functions:
+  api:
+    handler: deployment/lambda_handler.handler
+    timeout: 30
+    memorySize: 512
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-python-requirements
+  - serverless-wsgi
+
+custom:
+  wsgi:
+    app: app.main.app
+    packRequirements: false
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+
+package:
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .pytest_cache/**
+    - tests/**
+    - __pycache__/**
+    - "*.pyc"
+    - venv/**
+    - .env
+    - .env.*

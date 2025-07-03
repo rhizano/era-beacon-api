@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: beacon-api
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "./start.sh"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: beacon-api-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: API_V1_STR
+        value: /v1
+      - key: PROJECT_NAME
+        value: BLE Beacon Presence Tracking API
+      - key: DEBUG
+        value: false
+      - key: PYTHON_VERSION
+        value: "3.9"
+
+  - type: pserv
+    name: beacon-api-db
+    env: postgresql
+    plan: free
+    databaseName: beacon_api
+    databaseUser: beacon_admin

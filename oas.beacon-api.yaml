@@ -1,0 +1,581 @@
+openapi: 3.0.0
+info:
+  title: BLE Beacon Presence Tracking API
+  description: API for tracking user presence via BLE Beacons, including user authentication and beacon/presence log management.
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1 # Replace with your actual API base URL
+    description: Production server
+  - url: http://localhost:3000/v1 # Replace with your actual API base URL for local development
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT # Or specify another format if not JWT
+
+  schemas:
+    Beacon:
+      type: object
+      required:
+        - beacon_id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the beacon.
+          readOnly: true
+        beacon_id:
+          type: string
+          description: Unique identifier for the physical BLE beacon (e.g., UUID, MAC address).
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+        location_name:
+          type: string
+          nullable: true
+          description: Human-readable name of the beacon's location.
+          example: "Main Entrance"
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          description: Latitude coordinate of the beacon's location.
+          example: 34.052235
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          description: Longitude coordinate of the beacon's location.
+          example: -118.243683
+
+    PresenceLog:
+      type: object
+      required:
+        - user_id
+        - beacon_id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the presence log entry.
+          readOnly: true
+        user_id:
+          type: string
+          description: Identifier of the user whose presence is logged.
+          example: "user123"
+        beacon_id:
+          type: string
+          description: Identifier of the beacon detected.
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+        timestamp:
+          type: string
+          format: date-time
+          description: UTC timestamp when the presence was logged.
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          description: Latitude coordinate recorded at the time of presence.
+          example: 34.052235
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          description: Longitude coordinate recorded at the time of presence.
+          example: -118.243683
+        signal_strength:
+          type: integer
+          nullable: true
+          description: Signal strength (RSSI) of the beacon detected.
+          example: -75
+
+    UserRegistration:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Unique username for the user.
+          example: "john_doe"
+        password:
+          type: string
+          format: password
+          description: User's password.
+          example: "SecureP@ssw0rd123"
+
+    UserLogin:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: User's username.
+          example: "john_doe"
+        password:
+          type: string
+          format: password
+          description: User's password.
+          example: "SecureP@ssw0rd123"
+
+    AuthSuccess:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT bearer token for authentication.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyMTIzIiwiaWF0IjoxNjQ2MTQ0MDAwLCJleHAiOjE2NDYxNDc2MDB9.EXAMPLE_JWT_TOKEN"
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Error code.
+          example: 400
+        message:
+          type: string
+          description: Human-readable error message.
+          example: "Invalid input"
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 401
+            message: "Unauthorized: Missing or invalid token"
+    ForbiddenError:
+      description: The user does not have necessary permissions for the resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 403
+            message: "Forbidden: You do not have access to this resource"
+    NotFound:
+      description: The specified resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 404
+            message: "Resource not found"
+    BadRequest:
+      description: Bad request. Invalid input data.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 400
+            message: "Invalid input data"
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      operationId: registerUser
+      requestBody:
+        description: User registration details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        '201':
+          description: User successfully registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Conflict, user with this username already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 409
+                message: "User with this username already exists"
+
+  /auth/login:
+    post:
+      summary: Log in a user
+      operationId: loginUser
+      requestBody:
+        description: User login credentials
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: User successfully logged in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          description: Unauthorized, invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                message: "Invalid username or password"
+
+  /beacons:
+    get:
+      summary: Get a list of all beacons
+      operationId: getAllBeacons
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A list of beacons.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Beacon'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      summary: Create a new beacon
+      operationId: createBeacon
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Beacon object to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Beacon'
+            examples:
+              newBeacon:
+                value:
+                  beacon_id: "F2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+                  location_name: "Cafeteria Entrance"
+                  latitude: 34.052235
+                  longitude: -118.243683
+      responses:
+        '201':
+          description: Beacon successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beacon'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          description: Conflict, beacon with this beacon_id already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 409
+                message: "Beacon with this beacon_id already exists"
+
+  /beacons/{beacon_id}:
+    get:
+      summary: Get a beacon by its beacon_id
+      operationId: getBeaconById
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: beacon_id
+          schema:
+            type: string
+          required: true
+          description: Unique identifier of the beacon (e.g., UUID).
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+      responses:
+        '200':
+          description: Beacon details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beacon'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Update an existing beacon
+      operationId: updateBeacon
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: beacon_id
+          schema:
+            type: string
+          required: true
+          description: Unique identifier of the beacon to update.
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+      requestBody:
+        description: Beacon object with updated fields
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Beacon'
+            examples:
+              updateBeacon:
+                value:
+                  location_name: "Updated Main Entrance"
+                  latitude: 34.052235
+                  longitude: -118.243683
+      responses:
+        '200':
+          description: Beacon successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beacon'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Delete a beacon
+      operationId: deleteBeacon
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: beacon_id
+          schema:
+            type: string
+          required: true
+          description: Unique identifier of the beacon to delete.
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+      responses:
+        '204':
+          description: Beacon successfully deleted.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+		  
+  /presence-logs:
+    post:
+      summary: Log a user's presence near a beacon
+      operationId: createPresenceLog
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Presence log object to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - beacon_id
+              properties:
+                user_id:
+                  type: string
+                  description: Identifier of the user whose presence is logged.
+                  example: "user456"
+                beacon_id:
+                  type: string
+                  description: Identifier of the beacon detected.
+                  example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+                latitude:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Latitude coordinate recorded at the time of presence.
+                  example: 34.052235
+                longitude:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Longitude coordinate recorded at the time of presence.
+                  example: -118.243683
+                signal_strength:
+                  type: integer
+                  nullable: true
+                  description: Signal strength (RSSI) of the beacon detected.
+                  example: -75
+      responses:
+        '201':
+          description: Presence log successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresenceLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Beacon not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                message: "Beacon with provided beacon_id not found"
+
+    get:
+      summary: Get a list of all presence logs
+      operationId: getAllPresenceLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter logs by user ID.
+          example: "user456"
+        - in: query
+          name: beacon_id
+          schema:
+            type: string
+          description: Filter logs by beacon ID.
+          example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date-time
+          description: Filter logs from a specific timestamp (inclusive).
+          example: "2024-01-01T00:00:00Z"
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date-time
+          description: Filter logs up to a specific timestamp (exclusive).
+          example: "2024-01-31T23:59:59Z"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            default: 100
+          description: Maximum number of results to return.
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+          description: Number of results to skip for pagination.
+      responses:
+        '200':
+          description: A list of presence logs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PresenceLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /presence-logs/{id}:
+    get:
+      summary: Get a presence log by its ID
+      operationId: getPresenceLogById
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique identifier of the presence log.
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      responses:
+        '200':
+          description: Presence log details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresenceLog'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Delete a presence log by its ID
+      operationId: deletePresenceLog
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique identifier of the presence log to delete.
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      responses:
+        '204':
+          description: Presence log successfully deleted.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFound'
