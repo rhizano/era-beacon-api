@@ -1,13 +1,12 @@
 Create OAS document for API's requirements below.
 1. Implement Bearer Token Authentication: 
-     a) Integrate user registration and login endpoints into your To-Do List API.
+     a) Integrate user registration and login endpoints into BLE Beacon Presence Tracking.
      b) Secure your core API endpoints (Lists, Tasks) so they require a valid bearer token for access.      
      c) Goal: Prepare your API for secure, real-world frontend consumption.
 
 2. Build a Comprehensive Postman/Insomnia Collection:
-
      a) Organize all your API requests (GET, POST, PUT, DELETE) for BLE Beacon Presence Tracking.
-	 b) Database table scheme will be used:
+	 b) Postgresql Database will be used with table schemes:
 		 CREATE TABLE beacons (
 		  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		  beacon_id TEXT UNIQUE NOT NULL,
@@ -15,7 +14,6 @@ Create OAS document for API's requirements below.
 		  latitude DOUBLE PRECISION,
 		  longitude DOUBLE PRECISION
 		);
-
 		CREATE TABLE presence_logs (
 		  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		  user_id TEXT NOT NULL,

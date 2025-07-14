@@ -51,6 +51,12 @@ components:
           nullable: true
           description: Longitude coordinate of the beacon's location.
           example: -118.243683
+        app_token:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: FCM (Firebase Cloud Messaging) client app token for push notifications.
+          example: "eXQJ8V9K5fD:APA91bH..."
 
     PresenceLog:
       type: object
@@ -285,6 +291,7 @@ paths:
                   location_name: "Cafeteria Entrance"
                   latitude: 34.052235
                   longitude: -118.243683
+                  app_token: "eXQJ8V9K5fD:APA91bH..."
       responses:
         '201':
           description: Beacon successfully created.
@@ -361,6 +368,7 @@ paths:
                   location_name: "Updated Main Entrance"
                   latitude: 34.052235
                   longitude: -118.243683
+                  app_token: "eXQJ8V9K5fD:APA91bH_updated..."
       responses:
         '200':
           description: Beacon successfully updated.

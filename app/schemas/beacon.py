@@ -8,6 +8,7 @@ class BeaconBase(BaseModel):
     location_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    app_token: Optional[str] = None
 
 
 class BeaconCreate(BeaconBase):
@@ -19,7 +20,8 @@ class BeaconCreate(BeaconBase):
                 "beacon_id": "F2C56DB5-DFFB-48D2-B060-D0F5A71096E0",
                 "location_name": "Cafeteria Entrance",
                 "latitude": 34.052235,
-                "longitude": -118.243683
+                "longitude": -118.243683,
+                "app_token": "eXQJ8V9K5fD:APA91bH..."
             }
         }
 
@@ -29,13 +31,15 @@ class BeaconUpdate(BaseModel):
     location_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    app_token: Optional[str] = None
 
     class Config:
         json_schema_extra = {
             "example": {
                 "location_name": "Updated Main Entrance",
                 "latitude": 34.052235,
-                "longitude": -118.243683
+                "longitude": -118.243683,
+                "app_token": "eXQJ8V9K5fD:APA91bH..."
             }
         }
 
@@ -51,6 +55,7 @@ class Beacon(BeaconBase):
                 "beacon_id": "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0",
                 "location_name": "Main Entrance",
                 "latitude": 34.052235,
-                "longitude": -118.243683
+                "longitude": -118.243683,
+                "app_token": "eXQJ8V9K5fD:APA91bH..."
             }
         }
