@@ -587,3 +587,76 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFound'
+  /notifications/notify-to-qleap:
+    post:
+      summary: Send push notifications to Qleap for beacon detection
+      operationId: notifyToQleap
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Notification request data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - phone
+                - beacon_id
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Email of the detected member
+                  example: "member@example.com"
+                phone:
+                  type: string
+                  description: Phone number of the detected member
+                  example: "+1234567890"
+                beacon_id:
+                  type: string
+                  description: Identifier of the beacon that detected the member
+                  example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+      responses:
+        '200':
+          description: Notifications sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                    example: "Notifications sent successfully"
+                  notifications_sent:
+                    type: integer
+                    description: Number of notifications successfully sent
+                    example: 2
+                  beacon_id:
+                    type: string
+                    description: The beacon_id that was processed
+                    example: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Beacon not found or no app tokens available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "No beacons found with beacon_id 'INVALID-BEACON' or no app_tokens available"
+        '500':
+          description: Failed to send notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Failed to send any notifications"

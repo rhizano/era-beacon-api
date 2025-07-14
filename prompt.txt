@@ -25,3 +25,22 @@ Create OAS document for API's requirements below.
 		);
      c) Include example requests for login/registration and every CRUD operation, showing expected data and headers (especially for auth).      
      d) Goal: Create a clear, executable blueprint for frontend developers and AI.
+
+
+
+
+Create a new `POST /notify-to-qleap` endpoint. It should accept `email` (string), `phone` (string), and `beacon_id` (string) as input parameters. Inside the endpoint, retrieve `app_token` values from the `beacons` table where `beacon_id` matches the input. For each retrieved `app_token`, send a push notification using a cURL request to `https://even-trainer-464609-d1.et.r.appspot.com/send-notification`. The notification payload should include a dynamic `token` field (replaced with `app_token`), and static `title` ("Eraspace Member is Detected!"), `body` ("Open Information"), and `link` ("https://erabeacon-7e08e.web.app/").
+
+Add a new `POST /notify-to-qleap` endpoint. This endpoint will take `email` (string), `phone` (string), and `beacon_id` (string) as request body parameters. The core logic should involve:
+1. Querying the `beacons` table to fetch all `app_token`s associated with the provided `beacon_id`.
+2. Iterating through the retrieved `app_token`s.
+3. For each `app_token`, making a `POST` request to `https://even-trainer-464609-d1.et.r.appspot.com/send-notification` with `Content-Type: application/json`. The request body should be:
+   ```json
+   {
+     "token": "YOUR_APP_TOKEN_HERE",
+     "title": "Eraspace Member is Detected!",
+     "body": "Open Information",
+     "link": "[https://erabeacon-7e08e.web.app/](https://erabeacon-7e08e.web.app/)"
+   }
+
+Remember to replace "YOUR_APP_TOKEN_HERE" with the actual app_token's value.
