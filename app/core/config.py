@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
+    # FCM Configuration
+    fcm_server_key: Optional[str] = None
+    fcm_sender_id: Optional[str] = None
+    fcm_service_account_key_path: Optional[str] = None
+    fcm_project_id: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

@@ -156,6 +156,184 @@ components:
           description: Human-readable error message.
           example: "Invalid input"
 
+    # FCM Schemas
+    SendNotificationRequest:
+      type: object
+      required:
+        - token
+        - title
+        - body
+      properties:
+        token:
+          type: string
+          description: FCM device token
+          example: "eXQJ8V9K5fD:APA91bH..."
+        title:
+          type: string
+          description: Notification title
+          example: "Eraspace Member is Detected!"
+        body:
+          type: string
+          description: Notification body
+          example: "Open Information"
+        data:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom data payload
+          example:
+            beacon_id: "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+            user_id: "user123"
+        image:
+          type: string
+          description: Image URL for notification
+          example: "https://example.com/image.png"
+        click_action:
+          type: string
+          description: Action when notification is clicked
+          example: "FLUTTER_NOTIFICATION_CLICK"
+        link:
+          type: string
+          description: Web link to open
+          example: "https://erabeacon-7e08e.web.app/"
+
+    SendMultipleNotificationRequest:
+      type: object
+      required:
+        - tokens
+        - title
+        - body
+      properties:
+        tokens:
+          type: array
+          items:
+            type: string
+          description: List of FCM device tokens
+          example: ["token1", "token2", "token3"]
+        title:
+          type: string
+          description: Notification title
+          example: "Broadcast Message"
+        body:
+          type: string
+          description: Notification body
+          example: "Important announcement"
+        data:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom data payload
+        image:
+          type: string
+          description: Image URL for notification
+        click_action:
+          type: string
+          description: Action when notification is clicked
+        link:
+          type: string
+          description: Web link to open
+
+    SendTopicNotificationRequest:
+      type: object
+      required:
+        - topic
+        - title
+        - body
+      properties:
+        topic:
+          type: string
+          description: FCM topic name
+          example: "news"
+        title:
+          type: string
+          description: Notification title
+          example: "Breaking News"
+        body:
+          type: string
+          description: Notification body
+          example: "Important update available"
+        data:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom data payload
+        image:
+          type: string
+          description: Image URL for notification
+        click_action:
+          type: string
+          description: Action when notification is clicked
+
+    TopicSubscriptionRequest:
+      type: object
+      required:
+        - tokens
+        - topic
+      properties:
+        tokens:
+          type: array
+          items:
+            type: string
+          description: List of FCM device tokens
+          example: ["token1", "token2", "token3"]
+        topic:
+          type: string
+          description: Topic name to subscribe/unsubscribe
+          example: "news"
+
+    TokenValidationRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: FCM device token to validate
+          example: "eXQJ8V9K5fD:APA91bH..."
+
+    FCMResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Operation success status
+          example: true
+        message:
+          type: string
+          description: Response message
+          example: "Notification sent successfully"
+        data:
+          type: object
+          description: Response data
+        message_id:
+          type: string
+          description: FCM message ID
+          example: "0:1234567890123456%31bd1c9431bd1c94"
+        error:
+          type: string
+          description: Error message if failed
+
+    TokenValidationResponse:
+      type: object
+      required:
+        - token
+        - is_valid
+      properties:
+        token:
+          type: string
+          description: The validated token
+          example: "eXQJ8V9K5fD:APA91bH..."
+        is_valid:
+          type: boolean
+          description: Token validity status
+          example: true
+        details:
+          type: object
+          description: Validation details
+
   responses:
     UnauthorizedError:
       description: Authentication information is missing or invalid.
@@ -660,3 +838,214 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "Failed to send any notifications"
+
+  # FCM Endpoints
+  /fcm/send-notification:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Send push notification to a single device
+      operationId: sendNotification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+      responses:
+        '200':
+          description: Notification sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+
+  /fcm/send-multiple:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Send push notification to multiple devices
+      operationId: sendMultipleNotifications
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMultipleNotificationRequest'
+      responses:
+        '200':
+          description: Notifications sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+
+  /fcm/send-to-topic:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Send push notification to a topic
+      operationId: sendTopicNotification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTopicNotificationRequest'
+      responses:
+        '200':
+          description: Topic notification sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+
+  /fcm/subscribe-to-topic:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Subscribe device tokens to a topic
+      operationId: subscribeToTopic
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicSubscriptionRequest'
+      responses:
+        '200':
+          description: Successfully subscribed to topic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+
+  /fcm/unsubscribe-from-topic:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Unsubscribe device tokens from a topic
+      operationId: unsubscribeFromTopic
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicSubscriptionRequest'
+      responses:
+        '200':
+          description: Successfully unsubscribed from topic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FCMResponse'
+
+  /fcm/validate-token:
+    post:
+      tags:
+        - FCM Notifications
+      summary: Validate an FCM device token
+      operationId: validateToken
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenValidationRequest'
+      responses:
+        '200':
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+
+  /fcm/health:
+    get:
+      tags:
+        - FCM Notifications
+      summary: Check FCM service health
+      operationId: fcmHealthCheck
+      responses:
+        '200':
+          description: FCM service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  service:
+                    type: string
+                    example: "fcm"
+                  message:
+                    type: string
+                    example: "FCM service is operational"
+        '503':
+          description: FCM service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

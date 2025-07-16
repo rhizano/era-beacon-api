@@ -75,3 +75,8 @@ alembic/versions/
 # Docker
 .dockerignore
 node_modules
+
+# Firebase service account keys (contains sensitive credentials)
+service-account-key.json
+firebase-service-account.json
+*-service-account-key.json
