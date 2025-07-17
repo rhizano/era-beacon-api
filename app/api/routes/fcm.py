@@ -307,3 +307,34 @@ async def check_fcm_permissions():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check permissions: {str(e)}"
         )
+
+
+@router.get("/project-info")
+async def get_project_info():
+    """
+    Get Firebase project information for debugging SenderId mismatch issues
+    """
+    try:
+        fcm_service = FCMService()
+        project_info = fcm_service.get_project_info()
+        
+        return {
+            "status": "success",
+            "message": "Firebase project information",
+            "project_info": project_info,
+            "instructions": {
+                "sender_id_mismatch_fix": [
+                    f"Your client app must use SenderId (messagingSenderId): {project_info['sender_id']}",
+                    f"Your client app must use Project ID: {project_info['project_id']}",
+                    "Update your client app configuration (google-services.json for Android, Firebase config for Web)",
+                    "Regenerate FCM registration tokens after updating configuration",
+                    "Old tokens from different projects will not work"
+                ]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting project info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get project info: {str(e)}"
+        )

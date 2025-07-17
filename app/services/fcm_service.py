@@ -128,6 +128,32 @@ class FCMService:
             "Content-Type": "application/json"
         }
     
+    def get_project_info(self) -> Dict[str, str]:
+        """Get current Firebase project information"""
+        try:
+            if self.service_account_path and os.path.exists(self.service_account_path):
+                with open(self.service_account_path, 'r') as f:
+                    service_account_info = json.load(f)
+                
+                return {
+                    "project_id": service_account_info.get('project_id', self.project_id),
+                    "sender_id": service_account_info.get('client_id', 'Unknown'),
+                    "client_email": service_account_info.get('client_email', 'Unknown')
+                }
+            else:
+                return {
+                    "project_id": self.project_id,
+                    "sender_id": "Unknown - no service account file",
+                    "client_email": "Unknown - no service account file"
+                }
+        except Exception as e:
+            logger.error(f"Error getting project info: {str(e)}")
+            return {
+                "project_id": self.project_id,
+                "sender_id": f"Error: {str(e)}",
+                "client_email": f"Error: {str(e)}"
+            }
+    
     def check_service_account_permissions(self) -> Dict[str, Any]:
         """Check if the service account has proper FCM permissions"""
         try:
@@ -432,6 +458,23 @@ class FCMService:
                 # Provide specific guidance for 403 errors
                 if e.response.status_code == 403:
                     logger.error("403 Forbidden: Check Firebase service account permissions")
+                    
+                    # Check for SenderId mismatch specifically
+                    if isinstance(error_detail, dict) and 'error' in error_detail:
+                        error_info = error_detail['error']
+                        if error_info.get('message') == 'SenderId mismatch':
+                            sender_id_error = (
+                                f"SenderId mismatch detected! "
+                                f"Your client app tokens were generated for a different Firebase project. "
+                                f"Current server project: {self.project_id}. "
+                                f"Please ensure your client app uses the same Firebase project or "
+                                f"generate new tokens from the correct project."
+                            )
+                            logger.error(sender_id_error)
+                            raise HTTPException(
+                                status_code=e.response.status_code,
+                                detail=sender_id_error
+                            )
                     
                 raise HTTPException(
                     status_code=e.response.status_code,
