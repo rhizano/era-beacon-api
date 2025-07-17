@@ -130,31 +130,30 @@ class FCMService:
                            image: Optional[str] = None,
                            click_action: Optional[str] = None,
                            link: Optional[str] = None) -> Dict[str, Any]:
-        """Send notification to a specific device token"""
+        """Send notification to a specific device token using FCM v1 API"""
         
-        payload = {
-            "to": token,
-            "notification": {
-                "title": title,
-                "body": body
+        message = {
+            "message": {
+                "token": token,
+                "notification": {
+                    "title": title,
+                    "body": body
+                }
             }
         }
         
         if image:
-            payload["notification"]["image"] = image
+            message["message"]["notification"]["image"] = image
             
-        if click_action:
-            payload["notification"]["click_action"] = click_action
+        if data or link:
+            message_data = data.copy() if data else {}
+            if link:
+                message_data["link"] = link
+            if click_action:
+                message_data["click_action"] = click_action
+            message["message"]["data"] = message_data
             
-        if link:
-            if not data:
-                data = {}
-            data["link"] = link
-            
-        if data:
-            payload["data"] = data
-            
-        return self._send_request(payload)
+        return self._send_request_v1(message)
     
     async def send_to_multiple_tokens(self,
                                     tokens: List[str],
@@ -164,31 +163,37 @@ class FCMService:
                                     image: Optional[str] = None,
                                     click_action: Optional[str] = None,
                                     link: Optional[str] = None) -> Dict[str, Any]:
-        """Send notification to multiple device tokens"""
+        """Send notification to multiple device tokens using FCM v1 API"""
         
-        payload = {
-            "registration_ids": tokens,
-            "notification": {
-                "title": title,
-                "body": body
-            }
+        # FCM v1 API requires individual requests for multiple tokens
+        results = []
+        success_count = 0
+        failure_count = 0
+        
+        for token in tokens:
+            try:
+                result = await self.send_to_token(
+                    token=token,
+                    title=title,
+                    body=body,
+                    data=data,
+                    image=image,
+                    click_action=click_action,
+                    link=link
+                )
+                results.append({"token": token, "success": True, "result": result})
+                success_count += 1
+            except Exception as e:
+                results.append({"token": token, "success": False, "error": str(e)})
+                failure_count += 1
+                
+        return {
+            "multicast_id": "bulk_" + str(hash(tuple(tokens))),
+            "success": success_count,
+            "failure": failure_count,
+            "canonical_ids": 0,
+            "results": results
         }
-        
-        if image:
-            payload["notification"]["image"] = image
-            
-        if click_action:
-            payload["notification"]["click_action"] = click_action
-            
-        if link:
-            if not data:
-                data = {}
-            data["link"] = link
-            
-        if data:
-            payload["data"] = data
-            
-        return self._send_request(payload)
     
     async def send_to_topic(self,
                           topic: str,
@@ -197,26 +202,28 @@ class FCMService:
                           data: Optional[Dict[str, str]] = None,
                           image: Optional[str] = None,
                           click_action: Optional[str] = None) -> Dict[str, Any]:
-        """Send notification to a topic"""
+        """Send notification to a topic using FCM v1 API"""
         
-        payload = {
-            "to": f"/topics/{topic}",
-            "notification": {
-                "title": title,
-                "body": body
+        message = {
+            "message": {
+                "topic": topic,
+                "notification": {
+                    "title": title,
+                    "body": body
+                }
             }
         }
         
         if image:
-            payload["notification"]["image"] = image
+            message["message"]["notification"]["image"] = image
             
-        if click_action:
-            payload["notification"]["click_action"] = click_action
+        if data or click_action:
+            message_data = data.copy() if data else {}
+            if click_action:
+                message_data["click_action"] = click_action
+            message["message"]["data"] = message_data
             
-        if data:
-            payload["data"] = data
-            
-        return self._send_request(payload)
+        return self._send_request_v1(message)
     
     async def send_custom_message(self,
                                 token: Optional[str] = None,
@@ -227,36 +234,36 @@ class FCMService:
                                 android: Optional[Dict[str, Any]] = None,
                                 ios: Optional[Dict[str, Any]] = None,
                                 web: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Send custom FCM message with full control over payload"""
+        """Send custom FCM message with full control over payload using FCM v1 API"""
         
         if not any([token, topic, condition]):
             raise ValueError("At least one of token, topic, or condition must be provided")
         
-        payload = {}
+        message = {"message": {}}
         
         if token:
-            payload["to"] = token
+            message["message"]["token"] = token
         elif topic:
-            payload["to"] = f"/topics/{topic}"
+            message["message"]["topic"] = topic
         elif condition:
-            payload["condition"] = condition
+            message["message"]["condition"] = condition
             
         if notification:
-            payload["notification"] = notification
+            message["message"]["notification"] = notification
             
         if data:
-            payload["data"] = data
+            message["message"]["data"] = data
             
         if android:
-            payload["android"] = android
+            message["message"]["android"] = android
             
         if ios:
-            payload["apns"] = ios
+            message["message"]["apns"] = ios
             
         if web:
-            payload["webpush"] = web
+            message["message"]["webpush"] = web
             
-        return self._send_request(payload)
+        return self._send_request_v1(message)
     
     async def subscribe_to_topic(self, tokens: List[str], topic: str) -> Dict[str, Any]:
         """Subscribe device tokens to a topic"""
@@ -311,62 +318,57 @@ class FCMService:
             )
     
     async def validate_token(self, token: str) -> Tuple[bool, Dict[str, Any]]:
-        """Validate an FCM device token"""
+        """Validate an FCM device token using FCM v1 API"""
         
-        # Simple validation by sending a dry run message
-        payload = {
-            "to": token,
-            "dry_run": True,
-            "notification": {
-                "title": "Validation",
-                "body": "This is a validation message"
-            }
+        # Use a test message with validate_only flag
+        message = {
+            "message": {
+                "token": token,
+                "notification": {
+                    "title": "Validation",
+                    "body": "This is a validation message"
+                }
+            },
+            "validate_only": True
         }
         
-        headers = self._get_headers_legacy()
-        
         try:
-            response = requests.post(self.fcm_url, json=payload, headers=headers, timeout=10)
+            response = requests.post(
+                self.fcm_v1_url, 
+                json=message, 
+                headers=self._get_headers_v1(), 
+                timeout=10
+            )
             
             if response.status_code == 200:
-                result = response.json()
-                
-                # Check if token is valid based on response
-                if "results" in result and len(result["results"]) > 0:
-                    error = result["results"][0].get("error")
-                    if error in ["InvalidRegistration", "NotRegistered"]:
-                        return False, {"valid": False, "error": error}
-                    else:
-                        return True, {"valid": True, "response": result}
-                        
-                return True, {"valid": True, "response": result}
-                
+                return True, {"valid": True, "response": response.json()}
             else:
+                error_data = response.json() if response.text else {}
                 return False, {
                     "valid": False, 
                     "error": f"HTTP {response.status_code}",
-                    "response": response.text
+                    "response": error_data
                 }
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error validating token: {str(e)}")
             return False, {"valid": False, "error": str(e)}
     
-    def _send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Send FCM request using legacy API"""
+    def _send_request_v1(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Send FCM request using v1 API"""
         
-        headers = self._get_headers_legacy()
+        headers = self._get_headers_v1()
         
         try:
-            response = requests.post(self.fcm_url, json=payload, headers=headers, timeout=10)
+            response = requests.post(self.fcm_v1_url, json=payload, headers=headers, timeout=10)
             response.raise_for_status()
             
             result = response.json()
-            logger.info(f"FCM request successful: {result}")
+            logger.info(f"FCM v1 request successful: {result}")
             return result
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"FCM request failed: {str(e)}")
+            logger.error(f"FCM v1 request failed: {str(e)}")
             if hasattr(e, 'response') and e.response is not None:
                 try:
                     error_detail = e.response.json()

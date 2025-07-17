@@ -7,6 +7,7 @@ This project is configured to use Firebase Cloud Messaging (FCM) with service ac
 - **Project ID**: `erabeacon-customer`
 - **Service Account**: `firebase-adminsdk-fbsvc@erabeacon-customer.iam.gserviceaccount.com`
 - **Authentication Method**: Service Account Key (JSON file)
+- **FCM API Version**: v1 (modern HTTP v1 API)
 
 ## Files
 
@@ -81,5 +82,7 @@ If you encounter issues:
 
 1. **"FCM project ID is required"** - Check that `FCM_PROJECT_ID=erabeacon-customer` is set in `.env`
 2. **"Service account file not found"** - Ensure `service-account-key.json` exists in the project root
-3. **Authentication errors** - Verify the service account key file is valid and not corrupted
-4. **Permission errors** - The service account should have Firebase Messaging Admin permissions
+3. **"404 Not Found for FCM endpoint"** - The service now uses FCM v1 API (fixed in latest version)
+4. **Authentication errors** - Verify the service account key file is valid and not corrupted
+5. **Permission errors** - The service account should have Firebase Messaging Admin permissions
+6. **Token validation fails** - Ensure your device tokens are valid and not expired
