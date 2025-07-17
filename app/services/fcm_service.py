@@ -82,29 +82,35 @@ class FCMService:
         
     def _get_access_token(self) -> str:
         """Get access token for FCM API v1"""
-        if self.service_account_path and os.path.exists(self.service_account_path):
-            # Use service account for authentication
-            credentials = service_account.Credentials.from_service_account_file(
-                self.service_account_path, 
-                scopes=self.scopes
-            )
-            credentials.refresh(Request())
-            return credentials.token
-        else:
-            # Fallback to default credentials (for Cloud environments)
-            try:
-                credentials, project = google.auth.default(scopes=self.scopes)
+        try:
+            if self.service_account_path and os.path.exists(self.service_account_path):
+                # Use service account for authentication
+                credentials = service_account.Credentials.from_service_account_file(
+                    self.service_account_path, 
+                    scopes=self.scopes
+                )
                 credentials.refresh(Request())
+                logger.info(f"Successfully obtained access token for project: {self.project_id}")
                 return credentials.token
-            except Exception as e:
-                logger.error(f"Failed to get default credentials: {str(e)}")
-                # If no service account and no default credentials, we'll need a server key
-                server_key = settings.fcm_server_key
-                if server_key:
-                    logger.warning("Using legacy server key authentication")
-                    return server_key
-                else:
-                    raise ValueError("No valid authentication method found. Provide service account key or server key.")
+            else:
+                # Fallback to default credentials (for Cloud environments)
+                try:
+                    credentials, project = google.auth.default(scopes=self.scopes)
+                    credentials.refresh(Request())
+                    logger.info(f"Successfully obtained default credentials for project: {project}")
+                    return credentials.token
+                except Exception as e:
+                    logger.error(f"Failed to get default credentials: {str(e)}")
+                    # If no service account and no default credentials, we'll need a server key
+                    server_key = settings.fcm_server_key
+                    if server_key:
+                        logger.warning("Using legacy server key authentication")
+                        return server_key
+                    else:
+                        raise ValueError("No valid authentication method found. Provide service account key or server key.")
+        except Exception as e:
+            logger.error(f"Error getting access token: {str(e)}")
+            raise
     
     def _get_headers_v1(self) -> Dict[str, str]:
         """Get headers for FCM API v1"""
@@ -121,6 +127,52 @@ class FCMService:
             "Authorization": f"key={server_key}",
             "Content-Type": "application/json"
         }
+    
+    def check_service_account_permissions(self) -> Dict[str, Any]:
+        """Check if the service account has proper FCM permissions"""
+        try:
+            access_token = self._get_access_token()
+            logger.info(f"Successfully obtained access token")
+            
+            # Try to validate a dummy token to check permissions
+            test_message = {
+                "message": {
+                    "token": "dummy_token_for_testing",
+                    "notification": {
+                        "title": "Test",
+                        "body": "Permission test"
+                    }
+                },
+                "validate_only": True
+            }
+            
+            headers = self._get_headers_v1()
+            response = requests.post(self.fcm_v1_url, json=test_message, headers=headers, timeout=10)
+            
+            logger.info(f"Permission test response: {response.status_code}")
+            if response.status_code == 403:
+                error_detail = response.json() if response.text else "No error details"
+                logger.error(f"403 Permission error details: {error_detail}")
+                return {
+                    "has_permissions": False,
+                    "error": "Service account lacks FCM permissions",
+                    "details": error_detail,
+                    "status_code": 403
+                }
+            else:
+                return {
+                    "has_permissions": True,
+                    "message": "Service account has proper FCM permissions",
+                    "status_code": response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking permissions: {str(e)}")
+            return {
+                "has_permissions": False,
+                "error": str(e),
+                "details": "Failed to check permissions"
+            }
         
     async def send_to_token(self, 
                            token: str, 
@@ -372,8 +424,14 @@ class FCMService:
             if hasattr(e, 'response') and e.response is not None:
                 try:
                     error_detail = e.response.json()
+                    logger.error(f"FCM error response: {error_detail}")
                 except:
                     error_detail = e.response.text
+                    logger.error(f"FCM error text: {error_detail}")
+                    
+                # Provide specific guidance for 403 errors
+                if e.response.status_code == 403:
+                    logger.error("403 Forbidden: Check Firebase service account permissions")
                     
                 raise HTTPException(
                     status_code=e.response.status_code,

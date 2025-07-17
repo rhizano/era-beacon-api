@@ -270,3 +270,40 @@ async def fcm_health_check():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"FCM service unavailable: {str(e)}"
         )
+
+
+@router.get("/check-permissions", response_model=dict)
+async def check_fcm_permissions():
+    """
+    Check if the service account has proper FCM permissions
+    """
+    try:
+        fcm_service = FCMService()
+        permissions_check = fcm_service.check_service_account_permissions()
+        
+        if permissions_check.get("has_permissions"):
+            return {
+                "status": "success",
+                "message": "Service account has proper FCM permissions",
+                "details": permissions_check
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Service account lacks proper FCM permissions",
+                "details": permissions_check,
+                "troubleshooting": {
+                    "steps": [
+                        "1. Go to Firebase Console > Project Settings > Service Accounts",
+                        "2. Ensure the service account has 'Firebase Admin SDK' role",
+                        "3. Verify the service account has 'Firebase Messaging Admin' permissions",
+                        "4. Check if Firebase Cloud Messaging API is enabled in Google Cloud Console"
+                    ]
+                }
+            }
+    except Exception as e:
+        logger.error(f"Error checking FCM permissions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check permissions: {str(e)}"
+        )
