@@ -3,9 +3,8 @@
 
 set -o errexit  # Exit on error
 
-# Run database migrations (in case they weren't run in build)
-echo "Ensuring database is up to date..."
-alembic upgrade head
+# Skip database migrations - schema is already correct in production
+echo "Skipping database migrations - production schema is already up to date..."
 
 # Start the FastAPI application
 echo "Starting FastAPI application..."
