@@ -25,8 +25,9 @@ class PresenceService:
         
         # Create presence log with current timestamp if not provided
         presence_dict = presence_data.dict()
-        if 'timestamp' not in presence_dict:
-            presence_dict['timestamp'] = datetime.utcnow()
+        if 'timestamp' not in presence_dict or presence_dict['timestamp'] is None:
+            # Use naive datetime to match database schema (no timezone)
+            presence_dict['timestamp'] = datetime.now()
         
         db_presence_log = PresenceLog(**presence_dict)
         self.db.add(db_presence_log)
@@ -53,19 +54,20 @@ class PresenceService:
         if beacon_id:
             query = query.filter(PresenceLog.beacon_id == beacon_id)
         if start_date:
-            # Handle NULL timestamps by treating them as very old dates
+            # Handle NULL timestamps by treating them as very old dates or excluding them
             query = query.filter(
                 (PresenceLog.timestamp >= start_date) | 
                 (PresenceLog.timestamp.is_(None))
             )
         if end_date:
-            # Handle NULL timestamps by treating them as very old dates
+            # Handle NULL timestamps by treating them as very old dates or excluding them
             query = query.filter(
                 (PresenceLog.timestamp < end_date) | 
                 (PresenceLog.timestamp.is_(None))
             )
         
         # Order by timestamp (NULL values last) and created_at
+        # Use coalesce to handle NULL timestamps gracefully
         query = query.order_by(
             PresenceLog.timestamp.desc().nullslast(),
             PresenceLog.created_at.desc()

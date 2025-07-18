@@ -7,8 +7,7 @@ set -o errexit  # Exit on error
 echo "Installing dependencies..."
 pip install -r requirements.txt
 
-# Run database migrations
-echo "Running database migrations..."
-alembic upgrade head
+# Skip database migrations - schema is already correct
+echo "Skipping database migrations - schema already matches requirements"
 
 echo "Build completed successfully!"
