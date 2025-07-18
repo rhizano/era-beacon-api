@@ -13,7 +13,7 @@ class PresenceLog(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid(), index=True)
     # user_id text NOT NULL
     user_id = Column(Text, nullable=False, index=True)
-    # beacon_id text NULL
+    # beacon_id text NULL - with foreign key constraint (but make it optional for now)
     beacon_id = Column(Text, nullable=True, index=True)
     # "timestamp" timestamp NULL
     timestamp = Column(DateTime(timezone=False), nullable=True)  # Note: no timezone in your schema
@@ -27,8 +27,3 @@ class PresenceLog(Base):
     created_at = Column(DateTime(timezone=False), server_default=func.now(), nullable=True)
     # updated_at timestamp NULL
     updated_at = Column(DateTime(timezone=False), nullable=True)
-
-    # Foreign key constraint: CONSTRAINT presence_logs_beacon_id_fkey FOREIGN KEY (beacon_id) REFERENCES public.beacons(beacon_id)
-    __table_args__ = (
-        ForeignKey('beacons.beacon_id', name='presence_logs_beacon_id_fkey'),
-    )
