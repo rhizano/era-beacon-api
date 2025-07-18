@@ -14,15 +14,21 @@ class PresenceService:
 
     def create_presence_log(self, presence_data: PresenceLogCreate) -> PresenceLog:
         """Create a new presence log entry."""
-        # Verify that the beacon exists
-        beacon = self.db.query(Beacon).filter(Beacon.beacon_id == presence_data.beacon_id).first()
-        if not beacon:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Beacon with provided beacon_id not found"
-            )
+        # Verify that the beacon exists if beacon_id is provided
+        if presence_data.beacon_id:
+            beacon = self.db.query(Beacon).filter(Beacon.beacon_id == presence_data.beacon_id).first()
+            if not beacon:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Beacon with provided beacon_id not found"
+                )
         
-        db_presence_log = PresenceLog(**presence_data.dict())
+        # Create presence log with current timestamp if not provided
+        presence_dict = presence_data.dict()
+        if 'timestamp' not in presence_dict:
+            presence_dict['timestamp'] = datetime.utcnow()
+        
+        db_presence_log = PresenceLog(**presence_dict)
         self.db.add(db_presence_log)
         self.db.commit()
         self.db.refresh(db_presence_log)
@@ -47,9 +53,23 @@ class PresenceService:
         if beacon_id:
             query = query.filter(PresenceLog.beacon_id == beacon_id)
         if start_date:
-            query = query.filter(PresenceLog.timestamp >= start_date)
+            # Handle NULL timestamps by treating them as very old dates
+            query = query.filter(
+                (PresenceLog.timestamp >= start_date) | 
+                (PresenceLog.timestamp.is_(None))
+            )
         if end_date:
-            query = query.filter(PresenceLog.timestamp < end_date)
+            # Handle NULL timestamps by treating them as very old dates
+            query = query.filter(
+                (PresenceLog.timestamp < end_date) | 
+                (PresenceLog.timestamp.is_(None))
+            )
+        
+        # Order by timestamp (NULL values last) and created_at
+        query = query.order_by(
+            PresenceLog.timestamp.desc().nullslast(),
+            PresenceLog.created_at.desc()
+        )
         
         # Apply pagination
         query = query.offset(offset).limit(limit)
