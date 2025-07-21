@@ -3,6 +3,10 @@
 
 set -o errexit  # Exit on error
 
+# Upgrade pip to latest version
+echo "Upgrading pip..."
+pip install --upgrade pip
+
 # Install dependencies
 echo "Installing dependencies..."
 pip install -r requirements.txt

@@ -142,6 +142,26 @@ class NotificationService:
                 total_count = test_result.scalar()
                 print(f"DEBUG: Total rows in v_presence_tracking view: {total_count}")
                 logger.info(f"Total rows in v_presence_tracking view: {total_count}")
+                
+                # Check the actual column names and data
+                inspect_query = text("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'v_presence_tracking'
+                    ORDER BY ordinal_position
+                """)
+                columns_result = self.db.execute(inspect_query)
+                columns = columns_result.fetchall()
+                print(f"DEBUG: View columns: {[(col[0], col[1]) for col in columns]}")
+                
+                # Check actual data in the view
+                sample_query = text("SELECT * FROM v_presence_tracking LIMIT 3")
+                sample_result = self.db.execute(sample_query)
+                sample_rows = sample_result.fetchall()
+                print(f"DEBUG: Sample data from view:")
+                for i, row in enumerate(sample_rows):
+                    print(f"DEBUG: Sample row {i}: {dict(row._mapping)}")
+                
             except Exception as test_e:
                 print(f"DEBUG: Failed to access v_presence_tracking view: {test_e}")
                 logger.error(f"Failed to access v_presence_tracking view: {test_e}")
