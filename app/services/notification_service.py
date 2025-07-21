@@ -130,10 +130,28 @@ class NotificationService:
                 WHERE duration_minutes >= :threshold
             """)
             
+            logger.info(f"Executing query with threshold: {threshold}")
+            logger.info(f"Query: {query}")
+            
+            # Test database connection and view existence first
+            try:
+                test_query = text("SELECT COUNT(*) FROM v_presence_tracking")
+                test_result = self.db.execute(test_query)
+                total_count = test_result.scalar()
+                logger.info(f"Total rows in v_presence_tracking view: {total_count}")
+            except Exception as test_e:
+                logger.error(f"Failed to access v_presence_tracking view: {test_e}")
+                raise
+            
             result = self.db.execute(query, {"threshold": threshold})
             employees = []
             
-            for row in result:
+            # Debug: Log raw result
+            rows = result.fetchall()
+            logger.info(f"Raw query result: {len(rows)} rows returned")
+            
+            for i, row in enumerate(rows):
+                logger.info(f"Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
                 employees.append({
                     "employee_id": row[0],  # Employee ID
                     "employee_token": row[1]  # Employee Token
@@ -144,6 +162,8 @@ class NotificationService:
             
         except Exception as e:
             logger.error(f"Error querying v_presence_tracking view: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception details: {repr(e)}")
             raise
 
     async def send_absence_notification(self, employee_token: str, employee_id: str) -> bool:
@@ -201,10 +221,15 @@ class NotificationService:
             Dictionary with notification results
         """
         try:
+            logger.info(f"Starting notify_absence with threshold: {threshold}")
+            
             # Get employees exceeding threshold
             employees = await self.get_employees_exceeding_threshold(threshold)
             
+            logger.info(f"notify_absence: Retrieved {len(employees)} employees")
+            
             if not employees:
+                logger.warning(f"No employees found exceeding threshold of {threshold} minutes")
                 return {
                     "success": True,
                     "message": f"No employees found exceeding threshold of {threshold} minutes",
@@ -217,6 +242,8 @@ class NotificationService:
             successful_notifications = 0
             failed_notifications = 0
             
+            logger.info(f"Starting to send notifications to {len(employees)} employees")
+            
             for employee in employees:
                 success = await self.send_absence_notification(
                     employee["employee_token"], 
@@ -228,7 +255,7 @@ class NotificationService:
                 else:
                     failed_notifications += 1
             
-            return {
+            result = {
                 "success": True,
                 "message": f"Processed {len(employees)} employees",
                 "total_employees": len(employees),
@@ -237,8 +264,13 @@ class NotificationService:
                 "threshold_minutes": threshold
             }
             
+            logger.info(f"notify_absence completed: {result}")
+            return result
+            
         except Exception as e:
             logger.error(f"Error in notify_absence: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception details: {repr(e)}")
             return {
                 "success": False,
                 "message": f"Error processing absence notifications: {str(e)}",
