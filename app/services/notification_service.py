@@ -124,11 +124,15 @@ class NotificationService:
             List of dictionaries containing Employee ID and Employee Token
         """
         try:
-            # Revert to original query since direct DB shows positive values
+            # The view's duration_minutes is calculated incorrectly - giving negative values
+            # Let's create our own calculation for absence detection:
+            # - Employees with no presence today (Last Detection IS NULL)
+            # - OR employees whose last detection was more than threshold minutes ago
             query = text("""
                 SELECT "Employee ID", "Employee Token" 
                 FROM v_presence_tracking vpt 
-                WHERE duration_minutes >= :threshold
+                WHERE "Last Detection" IS NULL 
+                   OR EXTRACT(epoch FROM now() - "Last Detection") / 60 >= :threshold
             """)
             
             print(f"DEBUG: Executing query with threshold: {threshold}")
@@ -142,6 +146,18 @@ class NotificationService:
                 db_url_query = text("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()")
                 db_info = self.db.execute(db_url_query).fetchone()
                 print(f"DEBUG: Database info - DB: {db_info[0]}, User: {db_info[1]}, Host: {db_info[2]}, Port: {db_info[3]}")
+                
+                # Check current timezone settings
+                import datetime
+                import time
+                print(f"DEBUG: Python local time: {datetime.datetime.now()}")
+                print(f"DEBUG: Python UTC time: {datetime.datetime.now(datetime.timezone.utc)}")
+                print(f"DEBUG: System timezone: {time.tzname}")
+                
+                # Check database timezone
+                db_time_query = text("SELECT now(), current_setting('timezone')")
+                db_time_info = self.db.execute(db_time_query).fetchone()
+                print(f"DEBUG: Database time: {db_time_info[0]}, Database timezone: {db_time_info[1]}")
                 
                 test_query = text("SELECT COUNT(*) FROM v_presence_tracking")
                 test_result = self.db.execute(test_query)
@@ -175,13 +191,19 @@ class NotificationService:
                     test_count = test_result.scalar()
                     print(f"DEBUG: Rows with duration_minutes >= {test_threshold}: {test_count}")
                     
-                # Test what happens with the original manual query
-                manual_query = text('SELECT "Employee ID", "Employee Token" FROM v_presence_tracking WHERE duration_minutes >= 30')
-                manual_result = self.db.execute(manual_query)
-                manual_rows = manual_result.fetchall()
-                print(f"DEBUG: Manual query result (duration_minutes >= 30): {len(manual_rows)} rows")
-                for i, row in enumerate(manual_rows):
-                    print(f"DEBUG: Manual row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
+                # Test the new query with timezone correction
+                new_query_test = text("""
+                    SELECT "Employee ID", "Employee Token", "Last Detection",
+                           EXTRACT(epoch FROM now() - "Last Detection") / 60 as calculated_minutes
+                    FROM v_presence_tracking 
+                    WHERE "Last Detection" IS NULL 
+                       OR EXTRACT(epoch FROM now() - "Last Detection") / 60 >= :threshold
+                """)
+                new_result = self.db.execute(new_query_test, {"threshold": threshold})
+                new_rows = new_result.fetchall()
+                print(f"DEBUG: New timezone-corrected query result: {len(new_rows)} rows")
+                for i, row in enumerate(new_rows):
+                    print(f"DEBUG: New query row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}', Last Detection='{row[2]}', Calculated Minutes='{row[3]}'")
                 
             except Exception as test_e:
                 print(f"DEBUG: Failed to access v_presence_tracking view: {test_e}")

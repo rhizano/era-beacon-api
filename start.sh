@@ -3,6 +3,10 @@
 
 set -o errexit  # Exit on error
 
+# Set timezone to GMT+7 (Asia/Jakarta) to match database
+export TZ="Asia/Jakarta"
+echo "Set timezone to: $TZ"
+
 # Skip database migrations - schema is already correct in production
 echo "Skipping database migrations - production schema is already up to date..."
 

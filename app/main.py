@@ -2,6 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import auth, beacons, presence_logs, notifications
+import os
+import time
+
+# Set timezone to GMT+7 (Asia/Jakarta) to match database timezone
+os.environ['TZ'] = 'Asia/Jakarta'
+time.tzset()
 
 # Create FastAPI application
 app = FastAPI(
