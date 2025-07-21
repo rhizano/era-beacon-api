@@ -124,6 +124,7 @@ class NotificationService:
             List of dictionaries containing Employee ID and Employee Token
         """
         try:
+            # Revert to original query since direct DB shows positive values
             query = text("""
                 SELECT "Employee ID", "Employee Token" 
                 FROM v_presence_tracking vpt 
@@ -137,6 +138,11 @@ class NotificationService:
             
             # Test database connection and view existence first
             try:
+                # Check database connection details
+                db_url_query = text("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()")
+                db_info = self.db.execute(db_url_query).fetchone()
+                print(f"DEBUG: Database info - DB: {db_info[0]}, User: {db_info[1]}, Host: {db_info[2]}, Port: {db_info[3]}")
+                
                 test_query = text("SELECT COUNT(*) FROM v_presence_tracking")
                 test_result = self.db.execute(test_query)
                 total_count = test_result.scalar()
@@ -154,13 +160,28 @@ class NotificationService:
                 columns = columns_result.fetchall()
                 print(f"DEBUG: View columns: {[(col[0], col[1]) for col in columns]}")
                 
-                # Check actual data in the view
-                sample_query = text("SELECT * FROM v_presence_tracking LIMIT 3")
+                # Check actual data in the view - show ALL rows since there are only 2
+                sample_query = text("SELECT * FROM v_presence_tracking ORDER BY duration_minutes DESC")
                 sample_result = self.db.execute(sample_query)
                 sample_rows = sample_result.fetchall()
-                print(f"DEBUG: Sample data from view:")
+                print(f"DEBUG: ALL data from view (ordered by duration_minutes DESC):")
                 for i, row in enumerate(sample_rows):
-                    print(f"DEBUG: Sample row {i}: {dict(row._mapping)}")
+                    print(f"DEBUG: Row {i}: {dict(row._mapping)}")
+                
+                # Test the exact query with different thresholds
+                for test_threshold in [30, 0, -1000]:
+                    test_query = text("SELECT COUNT(*) FROM v_presence_tracking WHERE duration_minutes >= :threshold")
+                    test_result = self.db.execute(test_query, {"threshold": test_threshold})
+                    test_count = test_result.scalar()
+                    print(f"DEBUG: Rows with duration_minutes >= {test_threshold}: {test_count}")
+                    
+                # Test what happens with the original manual query
+                manual_query = text('SELECT "Employee ID", "Employee Token" FROM v_presence_tracking WHERE duration_minutes >= 30')
+                manual_result = self.db.execute(manual_query)
+                manual_rows = manual_result.fetchall()
+                print(f"DEBUG: Manual query result (duration_minutes >= 30): {len(manual_rows)} rows")
+                for i, row in enumerate(manual_rows):
+                    print(f"DEBUG: Manual row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
                 
             except Exception as test_e:
                 print(f"DEBUG: Failed to access v_presence_tracking view: {test_e}")
