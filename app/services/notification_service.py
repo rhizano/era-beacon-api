@@ -298,7 +298,7 @@ class NotificationService:
             logger.error(f"Exception details: {repr(e)}")
             raise
 
-    async def send_absence_notification(self, employee_token: str, employee_id: str) -> bool:
+    async def send_absence_notification(self, employee_token: str, employee_id: str) -> Dict[str, Any]:
         """
         Send FCM notification for absence to a specific employee.
         
@@ -307,7 +307,7 @@ class NotificationService:
             employee_id: Employee ID
             
         Returns:
-            True if successful, False otherwise
+            Dictionary with detailed notification result including curl and response info
         """
         try:
             notification_payload = {
@@ -323,6 +323,11 @@ class NotificationService:
                 "Content-Type": "application/json"
             }
             
+            # Generate curl command for debugging
+            curl_command = f"curl -X POST '{self.notification_url}' \\\n"
+            curl_command += f"  -H 'Content-Type: application/json' \\\n"
+            curl_command += f"  -d '{json.dumps(notification_payload)}'"
+            
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.notification_url,
@@ -331,16 +336,38 @@ class NotificationService:
                     timeout=30.0
                 )
                 
+                result = {
+                    "employee_id": employee_id,
+                    "request_curl": curl_command,
+                    "response_code": response.status_code,
+                    "response_message": response.text if response.text else "No response body"
+                }
+                
                 if response.status_code == 200:
                     logger.info(f"Successfully sent absence notification to employee {employee_id}")
-                    return True
+                    result["success"] = True
                 else:
                     logger.error(f"Failed to send absence notification to employee {employee_id}. Status: {response.status_code}, Response: {response.text}")
-                    return False
+                    result["success"] = False
+                
+                return result
                     
         except Exception as e:
-            logger.error(f"Error sending absence notification to employee {employee_id}: {str(e)}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Error sending absence notification to employee {employee_id}: {error_msg}")
+            
+            # Generate curl command even for failed requests
+            curl_command = f"curl -X POST '{self.notification_url}' \\\n"
+            curl_command += f"  -H 'Content-Type: application/json' \\\n"
+            curl_command += f"  -d '{json.dumps(notification_payload) if 'notification_payload' in locals() else '{}'}'"
+            
+            return {
+                "employee_id": employee_id,
+                "request_curl": curl_command,
+                "response_code": 0,
+                "response_message": f"Request failed: {error_msg}",
+                "success": False
+            }
 
     async def notify_absence(self, threshold: int) -> Dict[str, Any]:
         """
@@ -350,7 +377,7 @@ class NotificationService:
             threshold: Duration threshold in minutes
             
         Returns:
-            Dictionary with notification results
+            Dictionary with detailed notification results including curl requests and responses
         """
         try:
             print(f"DEBUG: Starting notify_absence with threshold: {threshold}")
@@ -367,36 +394,48 @@ class NotificationService:
                 logger.warning(f"No employees found exceeding threshold of {threshold} minutes")
                 return {
                     "success": True,
+                    "threshold_minutes": threshold,
                     "message": f"No employees found exceeding threshold of {threshold} minutes",
                     "total_employees": 0,
                     "notifications_sent": 0,
-                    "notifications_failed": 0
+                    "notifications_failed": 0,
+                    "notifications_detail": []
                 }
             
-            # Send notifications
+            # Send notifications and collect detailed results
             successful_notifications = 0
             failed_notifications = 0
+            notifications_detail = []
             
             logger.info(f"Starting to send notifications to {len(employees)} employees")
             
             for employee in employees:
-                success = await self.send_absence_notification(
+                notification_result = await self.send_absence_notification(
                     employee["employee_token"], 
                     employee["employee_id"]
                 )
                 
-                if success:
+                # Add to details list
+                notifications_detail.append({
+                    "employee_id": notification_result["employee_id"],
+                    "request_curl": notification_result["request_curl"],
+                    "response_code": notification_result["response_code"],
+                    "response_message": notification_result["response_message"]
+                })
+                
+                if notification_result["success"]:
                     successful_notifications += 1
                 else:
                     failed_notifications += 1
             
             result = {
                 "success": True,
+                "threshold_minutes": threshold,
                 "message": f"Processed {len(employees)} employees",
                 "total_employees": len(employees),
                 "notifications_sent": successful_notifications,
                 "notifications_failed": failed_notifications,
-                "threshold_minutes": threshold
+                "notifications_detail": notifications_detail
             }
             
             logger.info(f"notify_absence completed: {result}")
@@ -408,8 +447,10 @@ class NotificationService:
             logger.error(f"Exception details: {repr(e)}")
             return {
                 "success": False,
+                "threshold_minutes": threshold,
                 "message": f"Error processing absence notifications: {str(e)}",
                 "total_employees": 0,
                 "notifications_sent": 0,
-                "notifications_failed": 0
+                "notifications_failed": 0,
+                "notifications_detail": []
             }
