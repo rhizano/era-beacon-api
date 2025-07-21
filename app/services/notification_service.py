@@ -124,15 +124,30 @@ class NotificationService:
             List of dictionaries containing Employee ID and Employee Token
         """
         try:
-            # The view's duration_minutes is calculated incorrectly - giving negative values
-            # Let's create our own calculation for absence detection:
-            # - Employees with no presence today (Last Detection IS NULL)
-            # - OR employees whose last detection was more than threshold minutes ago
+            # The view's duration_minutes is calculated incorrectly due to timezone issues
+            # Let's create our own calculation that properly handles:
+            # 1. Employees with no presence logs (Last Detection = shift start time)  
+            # 2. Employees with actual presence logs but haven't been seen for a while
             query = text("""
-                SELECT "Employee ID", "Employee Token" 
+                SELECT "Employee ID", "Employee Token",
+                       CASE 
+                           WHEN "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp THEN 
+                               -- No actual presence logs, use full shift duration
+                               EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - (CURRENT_DATE || ' ' || "Shift In")::timestamp) / 60
+                           ELSE 
+                               -- Has presence logs, calculate time since last detection
+                               EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - "Last Detection") / 60
+                       END as calculated_minutes
                 FROM v_presence_tracking vpt 
-                WHERE "Last Detection" IS NULL 
-                   OR EXTRACT(epoch FROM now() - "Last Detection") / 60 >= :threshold
+                WHERE (
+                    -- Employee with no presence logs (Last Detection = shift start)
+                    "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp
+                    AND EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - (CURRENT_DATE || ' ' || "Shift In")::timestamp) / 60 >= :threshold
+                ) OR (
+                    -- Employee with presence logs but absent for threshold time
+                    "Last Detection" > (CURRENT_DATE || ' ' || "Shift In")::timestamp
+                    AND EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - "Last Detection") / 60 >= :threshold
+                )
             """)
             
             print(f"DEBUG: Executing query with threshold: {threshold}")
@@ -154,10 +169,20 @@ class NotificationService:
                 print(f"DEBUG: Python UTC time: {datetime.datetime.now(datetime.timezone.utc)}")
                 print(f"DEBUG: System timezone: {time.tzname}")
                 
-                # Check database timezone
+                # Check database timezone and set it correctly
                 db_time_query = text("SELECT now(), current_setting('timezone')")
                 db_time_info = self.db.execute(db_time_query).fetchone()
                 print(f"DEBUG: Database time: {db_time_info[0]}, Database timezone: {db_time_info[1]}")
+                
+                # Set database session timezone to match server
+                set_tz_query = text("SET timezone = 'Asia/Jakarta'")
+                self.db.execute(set_tz_query)
+                self.db.commit()
+                
+                # Check timezone after setting
+                db_time_query2 = text("SELECT now(), current_setting('timezone')")
+                db_time_info2 = self.db.execute(db_time_query2).fetchone()
+                print(f"DEBUG: Database time after timezone set: {db_time_info2[0]}, Database timezone: {db_time_info2[1]}")
                 
                 test_query = text("SELECT COUNT(*) FROM v_presence_tracking")
                 test_result = self.db.execute(test_query)
@@ -191,19 +216,53 @@ class NotificationService:
                     test_count = test_result.scalar()
                     print(f"DEBUG: Rows with duration_minutes >= {test_threshold}: {test_count}")
                     
-                # Test the new query with timezone correction
-                new_query_test = text("""
-                    SELECT "Employee ID", "Employee Token", "Last Detection",
-                           EXTRACT(epoch FROM now() - "Last Detection") / 60 as calculated_minutes
+                # Test the new corrected query logic
+                test_query = text("""
+                    SELECT "Employee ID", "Employee Token", "Last Detection", "Shift In",
+                           (CURRENT_DATE || ' ' || "Shift In")::timestamp as shift_start_today,
+                           CASE 
+                               WHEN "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp THEN 'NO_PRESENCE_LOGS'
+                               ELSE 'HAS_PRESENCE_LOGS'
+                           END as presence_status,
+                           CASE 
+                               WHEN "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp THEN 
+                                   EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - (CURRENT_DATE || ' ' || "Shift In")::timestamp) / 60
+                               ELSE 
+                                   EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - "Last Detection") / 60
+                           END as calculated_minutes
                     FROM v_presence_tracking 
-                    WHERE "Last Detection" IS NULL 
-                       OR EXTRACT(epoch FROM now() - "Last Detection") / 60 >= :threshold
+                    ORDER BY "Employee ID"
                 """)
-                new_result = self.db.execute(new_query_test, {"threshold": threshold})
-                new_rows = new_result.fetchall()
-                print(f"DEBUG: New timezone-corrected query result: {len(new_rows)} rows")
-                for i, row in enumerate(new_rows):
-                    print(f"DEBUG: New query row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}', Last Detection='{row[2]}', Calculated Minutes='{row[3]}'")
+                test_result = self.db.execute(test_query)
+                test_rows = test_result.fetchall()
+                print(f"DEBUG: Corrected absence calculation for ALL employees:")
+                for i, row in enumerate(test_rows):
+                    print(f"DEBUG: Employee {i}: ID='{row[0]}', Last Detection='{row[2]}', Shift Start Today='{row[4]}', Status='{row[5]}', Minutes='{row[6]}'")
+                
+                # Test with different thresholds using new logic
+                for test_threshold in [30, 0]:
+                    threshold_query = text("""
+                        SELECT "Employee ID", "Employee Token",
+                               CASE 
+                                   WHEN "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp THEN 
+                                       EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - (CURRENT_DATE || ' ' || "Shift In")::timestamp) / 60
+                                   ELSE 
+                                       EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - "Last Detection") / 60
+                               END as calculated_minutes
+                        FROM v_presence_tracking vpt 
+                        WHERE (
+                            "Last Detection" = (CURRENT_DATE || ' ' || "Shift In")::timestamp
+                            AND EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - (CURRENT_DATE || ' ' || "Shift In")::timestamp) / 60 >= :threshold
+                        ) OR (
+                            "Last Detection" > (CURRENT_DATE || ' ' || "Shift In")::timestamp
+                            AND EXTRACT(epoch FROM (now() AT TIME ZONE 'Asia/Jakarta') - "Last Detection") / 60 >= :threshold
+                        )
+                    """)
+                    threshold_result = self.db.execute(threshold_query, {"threshold": test_threshold})
+                    threshold_rows = threshold_result.fetchall()
+                    print(f"DEBUG: New query with threshold {test_threshold}: {len(threshold_rows)} employees")
+                    for i, row in enumerate(threshold_rows):
+                        print(f"DEBUG: Threshold {test_threshold} - Employee {i}: ID='{row[0]}', Minutes='{row[2]}'")
                 
             except Exception as test_e:
                 print(f"DEBUG: Failed to access v_presence_tracking view: {test_e}")
@@ -219,8 +278,8 @@ class NotificationService:
             logger.info(f"Raw query result: {len(rows)} rows returned")
             
             for i, row in enumerate(rows):
-                print(f"DEBUG: Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
-                logger.info(f"Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
+                print(f"DEBUG: Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}', Calculated Minutes='{row[2]}'")
+                logger.info(f"Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}', Calculated Minutes='{row[2]}'")
                 employees.append({
                     "employee_id": row[0],  # Employee ID
                     "employee_token": row[1]  # Employee Token
