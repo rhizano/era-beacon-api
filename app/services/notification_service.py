@@ -1,6 +1,8 @@
 import requests
 import json
+import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Dict, Any
 from fastapi import HTTPException, status
 from app.models.beacon import Beacon
@@ -110,3 +112,137 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Unexpected error sending notification to {app_token}: {str(e)}")
             return False
+
+    async def get_employees_exceeding_threshold(self, threshold: int) -> List[Dict[str, Any]]:
+        """
+        Query the v_presence_tracking view for employees exceeding the threshold.
+        
+        Args:
+            threshold: Duration in minutes to check against
+            
+        Returns:
+            List of dictionaries containing Employee ID and Employee Token
+        """
+        try:
+            query = text("""
+                SELECT "Employee ID", "Employee Token" 
+                FROM v_presence_tracking vpt 
+                WHERE duration_minutes >= :threshold
+            """)
+            
+            result = self.db.execute(query, {"threshold": threshold})
+            employees = []
+            
+            for row in result:
+                employees.append({
+                    "employee_id": row[0],  # Employee ID
+                    "employee_token": row[1]  # Employee Token
+                })
+            
+            logger.info(f"Found {len(employees)} employees exceeding threshold of {threshold} minutes")
+            return employees
+            
+        except Exception as e:
+            logger.error(f"Error querying v_presence_tracking view: {str(e)}")
+            raise
+
+    async def send_absence_notification(self, employee_token: str, employee_id: str) -> bool:
+        """
+        Send FCM notification for absence to a specific employee.
+        
+        Args:
+            employee_token: FCM token for the employee
+            employee_id: Employee ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            notification_payload = {
+                "token": employee_token,
+                "title": "No Presence Detected!",
+                "body": "Out of store range",
+                "data": {
+                    "employee_id": employee_id
+                }
+            }
+            
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.notification_url,
+                    json=notification_payload,
+                    headers=headers,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Successfully sent absence notification to employee {employee_id}")
+                    return True
+                else:
+                    logger.error(f"Failed to send absence notification to employee {employee_id}. Status: {response.status_code}, Response: {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error sending absence notification to employee {employee_id}: {str(e)}")
+            return False
+
+    async def notify_absence(self, threshold: int) -> Dict[str, Any]:
+        """
+        Main method to handle absence notifications.
+        
+        Args:
+            threshold: Duration threshold in minutes
+            
+        Returns:
+            Dictionary with notification results
+        """
+        try:
+            # Get employees exceeding threshold
+            employees = await self.get_employees_exceeding_threshold(threshold)
+            
+            if not employees:
+                return {
+                    "success": True,
+                    "message": f"No employees found exceeding threshold of {threshold} minutes",
+                    "total_employees": 0,
+                    "notifications_sent": 0,
+                    "notifications_failed": 0
+                }
+            
+            # Send notifications
+            successful_notifications = 0
+            failed_notifications = 0
+            
+            for employee in employees:
+                success = await self.send_absence_notification(
+                    employee["employee_token"], 
+                    employee["employee_id"]
+                )
+                
+                if success:
+                    successful_notifications += 1
+                else:
+                    failed_notifications += 1
+            
+            return {
+                "success": True,
+                "message": f"Processed {len(employees)} employees",
+                "total_employees": len(employees),
+                "notifications_sent": successful_notifications,
+                "notifications_failed": failed_notifications,
+                "threshold_minutes": threshold
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in notify_absence: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error processing absence notifications: {str(e)}",
+                "total_employees": 0,
+                "notifications_sent": 0,
+                "notifications_failed": 0
+            }

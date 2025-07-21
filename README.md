@@ -56,6 +56,37 @@ uvicorn app.main:app --reload
 
 The API will be available at `http://localhost:8000` and the interactive documentation at `http://localhost:8000/docs`.
 
+## New Endpoints
+
+### POST /v1/notifications/notify-absence
+
+Send absence notifications to employees who have exceeded a specified duration threshold.
+
+**Request Body:**
+```json
+{
+    "threshold": 30
+}
+```
+
+**Functionality:**
+1. Queries the `v_presence_tracking` view for employees with `duration_minutes >= threshold`
+2. Retrieves Employee ID and Employee Token for matching records
+3. Sends FCM notifications to each employee via `https://even-trainer-464609-d1.et.r.appspot.com/send-notification`
+4. Returns summary of notifications sent and failed
+
+**Response:**
+```json
+{
+    "success": true,
+    "message": "Processed 5 employees", 
+    "total_employees": 5,
+    "notifications_sent": 4,
+    "notifications_failed": 1,
+    "threshold_minutes": 30
+}
+```
+
 ## 🚀 Easy Deployment
 
 ### Render.com (Recommended - Free Tier)

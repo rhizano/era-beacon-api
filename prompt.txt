@@ -44,3 +44,52 @@ Add a new `POST /notify-to-qleap` endpoint. This endpoint will take `email` (str
    }
 
 Remember to replace "YOUR_APP_TOKEN_HERE" with the actual app_token's value.
+
+
+
+
+Create a new `POST /notify-absence` endpoint. It should accept `threshold` (numeric) as input parameters. 
+Inside the endpoint:
+1. SELECT query to using input parameter `threshold`: SELECT * FROM v_presence_tracking vpt WHERE duration_minutes >= <threshold>;
+2. For every row that get from query, make a `POST` request to FCM server using CURL's template:
+curl --location 'https://even-trainer-464609-d1.et.r.appspot.com/send-notification' \
+--header 'Content-Type: application/json' \
+--data '{
+    "token": <Employee Token>,
+    "title": "No Presence Detected!",
+    "body": "Out of store range",
+    "data": {
+        "employee_id": <Employee ID>
+    }
+}'
+
+
+
+Add a new `POST /notify-absence` API endpoint.
+
+**Input:**
+* Accepts a JSON request body with a numeric parameter: `threshold`.
+
+**Endpoint Logic:**
+1.  **Database Query:**
+    * Execute a `SELECT` query against the `v_presence_tracking` view.
+    * The query should identify records where `duration_minutes` is greater than or equal to the `threshold` value received from the API request's input parameter.
+    * The query should retrieve `Employee ID` and `Employee Token` for each matching record.
+    * Example query structure: `SELECT "Employee ID", "Employee Token" FROM v_presence_tracking vpt WHERE duration_minutes >= :threshold;`
+2.  **FCM Notification Loop:**
+    * Iterate through each row returned by the database query.
+    * For each row, construct and send a `POST` request to the FCM (Firebase Cloud Messaging) server.
+    * **FCM Endpoint:** `https://even-trainer-464609-d1.et.r.appspot.com/send-notification`
+    * **Request Headers:** `Content-Type: application/json`
+    * **Request Body (JSON):**
+        ```json
+        {
+            "token": "<Employee Token from query result>",
+            "title": "No Presence Detected!",
+            "body": "Out of store range",
+            "data": {
+                "employee_id": "<Employee ID from query result>"
+            }
+        }
+        ```
+    * Implement robust error handling for both the database operation and the FCM `POST` requests.
