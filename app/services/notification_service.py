@@ -130,6 +130,8 @@ class NotificationService:
                 WHERE duration_minutes >= :threshold
             """)
             
+            print(f"DEBUG: Executing query with threshold: {threshold}")
+            print(f"DEBUG: Query: {query}")
             logger.info(f"Executing query with threshold: {threshold}")
             logger.info(f"Query: {query}")
             
@@ -138,8 +140,10 @@ class NotificationService:
                 test_query = text("SELECT COUNT(*) FROM v_presence_tracking")
                 test_result = self.db.execute(test_query)
                 total_count = test_result.scalar()
+                print(f"DEBUG: Total rows in v_presence_tracking view: {total_count}")
                 logger.info(f"Total rows in v_presence_tracking view: {total_count}")
             except Exception as test_e:
+                print(f"DEBUG: Failed to access v_presence_tracking view: {test_e}")
                 logger.error(f"Failed to access v_presence_tracking view: {test_e}")
                 raise
             
@@ -148,19 +152,25 @@ class NotificationService:
             
             # Debug: Log raw result
             rows = result.fetchall()
+            print(f"DEBUG: Raw query result: {len(rows)} rows returned")
             logger.info(f"Raw query result: {len(rows)} rows returned")
             
             for i, row in enumerate(rows):
+                print(f"DEBUG: Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
                 logger.info(f"Row {i}: Employee ID='{row[0]}', Employee Token='{row[1]}'")
                 employees.append({
                     "employee_id": row[0],  # Employee ID
                     "employee_token": row[1]  # Employee Token
                 })
             
+            print(f"DEBUG: Found {len(employees)} employees exceeding threshold of {threshold} minutes")
             logger.info(f"Found {len(employees)} employees exceeding threshold of {threshold} minutes")
             return employees
             
         except Exception as e:
+            print(f"DEBUG: Error querying v_presence_tracking view: {str(e)}")
+            print(f"DEBUG: Exception type: {type(e).__name__}")
+            print(f"DEBUG: Exception details: {repr(e)}")
             logger.error(f"Error querying v_presence_tracking view: {str(e)}")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Exception details: {repr(e)}")
@@ -221,14 +231,17 @@ class NotificationService:
             Dictionary with notification results
         """
         try:
+            print(f"DEBUG: Starting notify_absence with threshold: {threshold}")
             logger.info(f"Starting notify_absence with threshold: {threshold}")
             
             # Get employees exceeding threshold
             employees = await self.get_employees_exceeding_threshold(threshold)
             
+            print(f"DEBUG: notify_absence: Retrieved {len(employees)} employees")
             logger.info(f"notify_absence: Retrieved {len(employees)} employees")
             
             if not employees:
+                print(f"DEBUG: No employees found exceeding threshold of {threshold} minutes")
                 logger.warning(f"No employees found exceeding threshold of {threshold} minutes")
                 return {
                     "success": True,
