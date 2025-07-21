@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 
 class NotifyToQleapRequest(BaseModel):
@@ -43,22 +43,48 @@ class NotifyAbsenceRequest(BaseModel):
         }
 
 
+class NotificationDetail(BaseModel):
+    employee_id: str
+    request_curl: str
+    response_code: int
+    response_message: str
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "employee_id": "202304676",
+                "request_curl": "curl -X POST 'https://example.com/send-notification' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"token\":\"abc123...\",\"title\":\"No Presence Detected!\",\"body\":\"Out of store range\"}'",
+                "response_code": 500,
+                "response_message": "{\"error\":\"Failed to send notification\",\"details\":\"Requested entity was not found.\"}"
+            }
+        }
+
+
 class NotifyAbsenceResponse(BaseModel):
     success: bool
+    threshold_minutes: Optional[int] = None
     message: str
     total_employees: int
     notifications_sent: int
     notifications_failed: int
-    threshold_minutes: Optional[int] = None
+    notifications_detail: List[NotificationDetail] = []
     
     class Config:
         json_schema_extra = {
             "example": {
                 "success": True,
-                "message": "Processed 5 employees",
-                "total_employees": 5,
-                "notifications_sent": 4,
-                "notifications_failed": 1,
-                "threshold_minutes": 30
+                "threshold_minutes": 30,
+                "message": "Processed 2 employees",
+                "total_employees": 2,
+                "notifications_sent": 0,
+                "notifications_failed": 2,
+                "notifications_detail": [
+                    {
+                        "employee_id": "202304676",
+                        "request_curl": "curl -X POST 'https://example.com/send-notification' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"token\":\"abc123...\",\"title\":\"No Presence Detected!\",\"body\":\"Out of store range\"}'",
+                        "response_code": 500,
+                        "response_message": "{\"error\":\"Failed to send notification\",\"details\":\"Requested entity was not found.\"}"
+                    }
+                ]
             }
         }

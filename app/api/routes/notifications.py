@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.services.notification_service import NotificationService
-from app.schemas.notification import NotifyToQleapRequest, NotifyToQleapResponse, NotifyAbsenceRequest, NotifyAbsenceResponse
+from app.schemas.notification import NotifyToQleapRequest, NotifyToQleapResponse, NotifyAbsenceRequest, NotifyAbsenceResponse, NotificationDetail
 from app.schemas.error import ErrorResponse
 from app.core.security import verify_token
 
