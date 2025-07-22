@@ -236,13 +236,22 @@ class EraBeaconScheduler:
             
             if response.status_code == 200:
                 auth_data = response.json()
-                self.access_token = auth_data.get("access_token")
+                # API returns token in 'token' field, not 'access_token'
+                self.access_token = auth_data.get("token")
+                
+                if not self.access_token:
+                    error_msg = f"No token received in authentication response: {auth_data}"
+                    self.logger.error(error_msg)
+                    self._log_to_server(error_msg, 'ERROR')
+                    return False
                 
                 # Set token expiration (assume 1 hour if not provided)
                 expires_in = auth_data.get("expires_in", 3600)  # Default 1 hour
                 self.token_expires_at = datetime.now() + timedelta(seconds=expires_in)
                 
-                success_msg = f"Authentication successful - Token expires at {self.token_expires_at}"
+                # Log partial token for debugging (first 10 and last 4 characters)
+                token_preview = f"{self.access_token[:10]}...{self.access_token[-4:]}" if len(self.access_token) > 14 else "***"
+                success_msg = f"Authentication successful - Token received: {token_preview}, expires at {self.token_expires_at}"
                 self.logger.info(success_msg)
                 self._log_to_server(success_msg)
                 return True
@@ -322,6 +331,12 @@ class EraBeaconScheduler:
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": "application/json"
             }
+            
+            # Debug logging (mask token for security)
+            token_preview = f"{self.access_token[:10]}...{self.access_token[-4:]}" if self.access_token and len(self.access_token) > 14 else "None"
+            debug_msg = f"Making notification request with token: {token_preview}"
+            self.logger.debug(debug_msg)
+            self._log_to_server(debug_msg, 'DEBUG')
             
             response = requests.post(
                 self.notify_url,
