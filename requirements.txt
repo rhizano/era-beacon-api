@@ -16,6 +16,9 @@ python-dotenv==1.0.0
 requests==2.31.0
 gunicorn==21.2.0
 mangum==0.19.0
+# Scheduler dependencies
+apscheduler==3.10.4
+configparser==6.0.0
 # FCM dependencies removed - see archived_fcm/ directory if needed
 # google-auth==2.24.0
 # google-auth-oauthlib==1.1.0
