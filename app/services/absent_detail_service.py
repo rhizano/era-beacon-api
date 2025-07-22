@@ -1,7 +1,11 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any
+import logging
 from app.schemas.absent_detail import AbsentDetailRecord
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 class AbsentDetailService:
@@ -24,6 +28,8 @@ class AbsentDetailService:
             Exception: If database query fails
         """
         try:
+            logger.info(f"Querying absent detail for employee_id: {employee_id}")
+            
             # Execute the specific SQL query as requested
             query = text("""
                 SELECT "Store ID", "Store", "Location", "Employee ID", "Employee", 
@@ -32,8 +38,24 @@ class AbsentDetailService:
                 WHERE "Employee ID" = :employee_id
             """)
             
+            logger.info(f"Executing query with parameter employee_id: '{employee_id}'")
             result = self.db.execute(query, {"employee_id": employee_id})
             rows = result.fetchall()
+            
+            logger.info(f"Query returned {len(rows)} rows")
+            
+            # Log the first few rows for debugging
+            if rows:
+                for i, row in enumerate(rows[:3]):  # Log first 3 rows max
+                    logger.info(f"Row {i}: {dict(zip(['Store ID', 'Store', 'Location', 'Employee ID', 'Employee', 'Shift In', 'Shift Out', 'Last Detection', 'Absent Duration'], row))}")
+            else:
+                logger.warning(f"No rows found for employee_id: {employee_id}")
+                
+                # Let's also try a more permissive query to see if the employee exists at all
+                test_query = text("SELECT DISTINCT \"Employee ID\" FROM v_presence_tracking LIMIT 10")
+                test_result = self.db.execute(test_query)
+                test_rows = test_result.fetchall()
+                logger.info(f"Sample employee IDs in view: {[row[0] for row in test_rows]}")
             
             # Convert rows to list of AbsentDetailRecord objects
             records = []
@@ -51,7 +73,9 @@ class AbsentDetailService:
                 )
                 records.append(record)
             
+            logger.info(f"Converted {len(records)} records to AbsentDetailRecord objects")
             return records
             
         except Exception as e:
+            logger.error(f"Database query failed for employee_id {employee_id}: {str(e)}")
             raise Exception(f"Failed to query absent detail data: {str(e)}")
