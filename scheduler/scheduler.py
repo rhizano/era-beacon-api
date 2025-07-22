@@ -75,7 +75,8 @@ class EraBeaconScheduler:
         
     def _load_config(self, config_file: str) -> configparser.ConfigParser:
         """Load configuration from INI file."""
-        config = configparser.ConfigParser()
+        # Use RawConfigParser to avoid interpolation issues with logging format
+        config = configparser.RawConfigParser()
         try:
             config.read(config_file)
             return config
