@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import auth, beacons, presence_logs, notifications
+from app.api.routes import auth, beacons, presence_logs, notifications, absent_detail
 import os
 import time
 
@@ -33,6 +33,7 @@ app.include_router(auth.router, prefix=settings.api_v1_str)
 app.include_router(beacons.router, prefix=settings.api_v1_str)
 app.include_router(presence_logs.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
+app.include_router(absent_detail.router, prefix=settings.api_v1_str)
 
 
 @app.get("/")

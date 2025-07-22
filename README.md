@@ -87,6 +87,49 @@ Send absence notifications to employees who have exceeded a specified duration t
 }
 ```
 
+### GET /v1/absent-detail
+
+Get detailed absence information for a specific employee from the presence tracking view.
+
+**Query Parameters:**
+- `employee_id` (required): The employee ID to get absent details for
+
+**Functionality:**
+1. Executes a SELECT query against the `v_presence_tracking` view
+2. Filters results by the provided `employee_id`
+3. Returns detailed information about the employee's presence status
+
+**SQL Query Executed:**
+```sql
+SELECT "Store ID", "Store", "Location", "Employee ID", "Employee", 
+       "Shift In", "Shift Out", "Last Detection", "Absent Duration (Hour:Minute)"
+FROM v_presence_tracking
+WHERE "Employee ID" = :employee_id;
+```
+
+**Response:**
+```json
+[
+    {
+        "store_id": "ST001",
+        "store": "Main Store",
+        "location": "Downtown",
+        "employee_id": "EMP001",
+        "employee": "John Doe",
+        "shift_in": "2025-07-22 09:00:00",
+        "shift_out": "2025-07-22 18:00:00",
+        "last_detection": "2025-07-22 10:30:00",
+        "absent_duration": "07:30"
+    }
+]
+```
+
+**Error Responses:**
+- `400 Bad Request`: Missing or invalid employee_id parameter
+- `404 Not Found`: No records found for the specified employee_id
+- `401 Unauthorized`: Authentication required
+- `500 Internal Server Error`: Database or server error
+
 ## 🚀 Easy Deployment
 
 ### Render.com (Recommended - Free Tier)
